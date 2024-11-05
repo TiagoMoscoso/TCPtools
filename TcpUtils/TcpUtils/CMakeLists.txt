@@ -3,7 +3,7 @@
 #
 
 # Adicione a origem ao executável deste projeto.
-add_executable (TcpUtils "TcpUtils.cpp" "TcpUtils.h")
+add_executable (TcpUtils "TcpUtils.cpp" "TcpUtils.h" "Messaging/Message.cpp" "Messaging/IMessage.cpp" "TCPServer.cpp" "TCPClient.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET TcpUtils PROPERTY CXX_STANDARD 20)

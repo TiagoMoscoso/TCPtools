@@ -1,15 +1,9 @@
-﻿# CMakeList.txt: arquivo de projeto de CMake de nível superior, fazer configuração global
-# e inclua subprojetos aqui.
-#
-cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.10)
 
-# Habilite a Recarga Dinâmica para compiladores MSVC, se houver suporte.
-if (POLICY CMP0141)
-  cmake_policy(SET CMP0141 NEW)
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
-endif()
+project(ServerTCP)
 
-project ("ServerTCP")
+find_package(fmt CONFIG REQUIRED)
 
-# Inclua subprojetos.
-add_subdirectory ("ServerTCP")
+add_executable(Main Main.cpp "Logger.h" "ServerTCP.cpp")
+
+target_link_libraries(Main PRIVATE fmt::fmt)

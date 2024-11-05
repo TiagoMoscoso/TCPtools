@@ -1,5 +1,0 @@
-C:/Users/tiago/source/repos/TCPtools/ClientTCP/out/build/x64-debug/CMakeFiles/edit_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ClientTCP/out/build/x64-debug/CMakeFiles/rebuild_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ClientTCP/out/build/x64-debug/ClientTCP/CMakeFiles/ClientTCP.dir
-C:/Users/tiago/source/repos/TCPtools/ClientTCP/out/build/x64-debug/ClientTCP/CMakeFiles/edit_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ClientTCP/out/build/x64-debug/ClientTCP/CMakeFiles/rebuild_cache.dir

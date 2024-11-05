@@ -1,5 +1,0 @@
-C:/Users/tiago/source/repos/TCPtools/ServerTCP/out/build/x64-debug/CMakeFiles/edit_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ServerTCP/out/build/x64-debug/CMakeFiles/rebuild_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ServerTCP/out/build/x64-debug/ServerTCP/CMakeFiles/ServerTCP.dir
-C:/Users/tiago/source/repos/TCPtools/ServerTCP/out/build/x64-debug/ServerTCP/CMakeFiles/edit_cache.dir
-C:/Users/tiago/source/repos/TCPtools/ServerTCP/out/build/x64-debug/ServerTCP/CMakeFiles/rebuild_cache.dir

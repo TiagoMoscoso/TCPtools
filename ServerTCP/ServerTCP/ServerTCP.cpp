@@ -1,12 +1,7 @@
-﻿// ServerTCP.cpp: define o ponto de entrada para o aplicativo.
-//
-
-#include "ServerTCP.h"
-
-using namespace std;
+﻿#include <fmt/core.h>
 
 int main()
 {
-	cout << "Hello CMake." << endl;
-	return 0;
+    fmt::print("Hello World!\n");
+    return 0;
 }
