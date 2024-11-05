@@ -2,11 +2,17 @@
 //
 
 #include "TcpUtils.h"
-
+#include "TCPServer.cpp"
+#include "TCPClient.cpp"
 using namespace std;
 
 int main()
 {
-	cout << "Hello CMake." << endl;
-	return 0;
+	TCPServer tcpServer = TCPServer(5060);
+	while (true) 
+	{ 
+		char* recivedMessage = tcpServer.ThreatMessage();
+		cout << recivedMessage;
+	}
+	//TCPClient* client = new TCPClient();
 }

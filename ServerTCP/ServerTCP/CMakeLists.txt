@@ -1,12 +1,9 @@
-﻿# CMakeList.txt: projeto de CMake para ServerTCP, incluir origem e definir
-# lógica específica a um projeto aqui.
-#
+﻿cmake_minimum_required(VERSION 3.10)
 
-# Adicione a origem ao executável deste projeto.
-add_executable (ServerTCP "ServerTCP.cpp" "ServerTCP.h")
+project(HelloWorld)
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET ServerTCP PROPERTY CXX_STANDARD 20)
-endif()
+find_package(fmt CONFIG REQUIRED)
 
-# TODO: Adicione testes e instale destinos, se necessário.
+add_executable(HelloWorld helloworld.cpp)
+
+target_link_libraries(HelloWorld PRIVATE fmt::fmt)
