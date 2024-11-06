@@ -3,6 +3,9 @@
 #include <ws2tcpip.h>
 #include <cstdint>
 #include <string>
+
+using namespace std;
+
 #pragma comment(lib, "ws2_32.lib") // Link with ws2_32.lib
 #define BUFFER_SIZE 1024
 
@@ -17,7 +20,7 @@ private:
     char _address[12] = "127.0.0.1";
     u_short _port = 5060;
 public:
-    TCPClient(u_short port, const char address[12])
+    TCPClient(const char address[12], u_short port)
     {
         strcpy(_address, address);
         _port = port;
@@ -45,6 +48,8 @@ public:
             WSACleanup();
             exit(EXIT_FAILURE);
         }
+        SendMessages();
+        MessageRecive();
 
     }
 
