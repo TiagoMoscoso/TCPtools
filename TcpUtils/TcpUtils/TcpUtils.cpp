@@ -8,11 +8,7 @@ using namespace std;
 
 int main()
 {
-	TCPServer tcpServer = TCPServer(5060);
-	while (true) 
-	{ 
-		char* recivedMessage = tcpServer.ThreatMessage();
-		cout << recivedMessage;
-	}
-	//TCPClient* client = new TCPClient();
+	auto tcpServer = TCPServer(5060);
+	tcpServer.Start();
+	//TCPClient* client = new TCPClient("127.0.0.1", 5060);
 }

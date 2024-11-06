@@ -11,6 +11,10 @@
 # include <arpa/inet.h> 
 # include <unistd.h>
 #endif
+#include <list>
+#include <queue>
+#include <algorithm>
+
 using namespace std;
 #define BUFFER_SIZE 1024
 class TCPServer {
@@ -20,8 +24,14 @@ private:
     int _opt = 1;
     int _addrlen = sizeof(_address);
     int _port = 5060;
+    struct timeval _timeout;
+    fd_set _readfds;
+    list<int> _client_sockets;
 public:
-    TCPServer(int port) {
+    queue<char[1024]> MessageQueue;
+
+    TCPServer(int port) 
+    {
         _port = port;
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -58,32 +68,89 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        printf("SERVER RUNNING\n");
+        _timeout.tv_sec = 1;
+        _timeout.tv_usec = 0;
+
+        cout << "Server is running in port " << port;
     }
 
-    char* ThreatMessage() {
-        int new_socket;
-        char buffer[140] = { 0 };
+    void Start()
+    {
 
-        new_socket = accept(_server_fd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
-        if (new_socket < 0) {
-            perror("Accept failed");
-            return  { 0 };
+        int new_socket = 0;
+        char buffer[1024] = { 0 };
+
+
+        FD_ZERO(&_readfds);
+        FD_SET(_server_fd, &_readfds);
+
+        if (select(_server_fd + 1, &_readfds, NULL, NULL, &_timeout) <= 0 && _client_sockets.size() == 0)
+            return;
+
+        if (FD_ISSET(_server_fd, &_readfds))
+            if ((new_socket = accept(_server_fd, (struct sockaddr*)&_address, &_addrlen)) < 0)
+                    return;
+
+
+        FD_SET(new_socket, &_readfds);
+
+
+        auto it = find(_client_sockets.begin(), _client_sockets.end(), new_socket);
+        if (it == _client_sockets.end()) _client_sockets.push_front(new_socket);
+
+        auto disconected_sockets = list<int>();
+
+        for (auto socket : _client_sockets)
+        {
+                
+            if (FD_ISSET(socket, &_readfds))
+            {
+                auto valread = recv(socket, buffer, sizeof(buffer), 0);
+                if (valread <= 0) 
+                {
+                    cout << "Client Disconected " << socket << endl;
+                    closesocket(socket);
+                    FD_CLR(socket, &_readfds);
+                    disconected_sockets.push_front(socket);
+                }
+                else if (valread > 0)
+                {
+                    cout << "Data recived from client "<< socket << " :" << buffer << endl;
+
+                    //MessageQueue.push(buffer);
+
+                    auto response = "server ok";
+
+                    SendMessage(socket, (char*)response);
+
+                    cout << "Response sent to the client." << endl;
+                }
+            }
         }
-        #ifdef _WIN64
-        recv(new_socket, buffer, sizeof(buffer), 0);
-        #else
-        read(new_socket, buffer, sizeof(buffer));
-        #endif
+
+        for (auto socket : disconected_sockets)
+        {
+            _client_sockets.remove(socket);
+        }
         
-
-        const char* response = "Ok";
-        send(new_socket, response, strlen(response), 0);
-
-        return buffer;
     }
 
-    ~TCPServer() {
+    bool SendMessage(int socket, char* message) 
+    { 
+        try
+        {
+            send(socket, message, strlen(message), 0);
+            return true;
+        }
+        catch (exception)
+        {
+            return false;
+        }
+    }
+
+
+    ~TCPServer() 
+    {
 
         #ifdef _WIN64
         closesocket(_server_fd);
