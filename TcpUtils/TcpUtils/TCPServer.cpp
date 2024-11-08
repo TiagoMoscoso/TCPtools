@@ -14,6 +14,7 @@
 #include <list>
 #include <queue>
 #include <algorithm>
+#include <functional>
 
 using namespace std;
 #define BUFFER_SIZE 1024
@@ -27,12 +28,13 @@ private:
     struct timeval _timeout;
     fd_set _readfds;
     list<int> _client_sockets;
+    function<void(int, char[1024])> _event;
 public:
-    queue<char[1024]> MessageQueue;
 
-    TCPServer(int port) 
+    TCPServer(int port, const function<void(int, char[1024])>& event)
     {
         _port = port;
+        _event = event;
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
             printf("Failed to initialize Winsock. Error Code: %d\n", WSAGetLastError());
@@ -48,7 +50,7 @@ public:
 
 
         #ifdef _WIN64
-        setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&_opt, sizeof(_opt));
+        setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, (char*)&_opt, sizeof(_opt));
         #else
         setsockopt(_server_fd, SOL_SOCKET, SO_REUSEPORT, &_opt, sizeof(_opt));
         #endif
@@ -57,11 +59,15 @@ public:
         _address.sin_addr.s_addr = INADDR_ANY;
         _address.sin_port = htons(_port);
 
-        if (bind(_server_fd, (struct sockaddr*)&_address, sizeof(_address)) < 0) {
+
+        #ifdef _WIN64
+        if (::bind(_server_fd, (struct sockaddr*)&_address, sizeof(_address)) < 0)
+        {
             fprintf(stderr, "Bind failed: %d\n", WSAGetLastError());
             WSACleanup();
             exit(EXIT_FAILURE);
         }
+        #endif
 
         if (listen(_server_fd, 3) < 0) {
             perror("Listen failed");
@@ -80,63 +86,59 @@ public:
         int new_socket = 0;
         char buffer[1024] = { 0 };
 
-
-        FD_ZERO(&_readfds);
-        FD_SET(_server_fd, &_readfds);
-
-        if (select(_server_fd + 1, &_readfds, NULL, NULL, &_timeout) <= 0 && _client_sockets.size() == 0)
-            return;
-
-        if (FD_ISSET(_server_fd, &_readfds))
-            if ((new_socket = accept(_server_fd, (struct sockaddr*)&_address, &_addrlen)) < 0)
-                    return;
-
-
-        FD_SET(new_socket, &_readfds);
-
-
-        auto it = find(_client_sockets.begin(), _client_sockets.end(), new_socket);
-        if (it == _client_sockets.end()) _client_sockets.push_front(new_socket);
-
-        auto disconected_sockets = list<int>();
-
-        for (auto socket : _client_sockets)
+        while (true)
         {
-                
-            if (FD_ISSET(socket, &_readfds))
+            FD_ZERO(&_readfds);
+            FD_SET(_server_fd, &_readfds);
+
+            if (select(_server_fd + 1, &_readfds, NULL, NULL, &_timeout) <= 0 && _client_sockets.size() == 0)
+                continue;
+
+            if (FD_ISSET(_server_fd, &_readfds))
+                if ((new_socket = accept(_server_fd, (struct sockaddr*)&_address, &_addrlen)) < 0)
+                    continue;
+
+
+            FD_SET(new_socket, &_readfds);
+
+
+            auto it = find(_client_sockets.begin(), _client_sockets.end(), new_socket);
+            if (it == _client_sockets.end()) _client_sockets.push_front(new_socket);
+
+            auto disconected_sockets = list<int>();
+
+            for (auto socket : _client_sockets)
             {
-                auto valread = recv(socket, buffer, sizeof(buffer), 0);
-                if (valread <= 0) 
+
+                if (FD_ISSET(socket, &_readfds))
                 {
-                    cout << "Client Disconected " << socket << endl;
-                    closesocket(socket);
-                    FD_CLR(socket, &_readfds);
-                    disconected_sockets.push_front(socket);
+                    auto valread = recv(socket, buffer, sizeof(buffer), 0);
+                    if (valread <= 0)
+                    {
+                        cout << "Client Disconected " << socket << endl;
+                        closesocket(socket);
+                        FD_CLR(socket, &_readfds);
+                        disconected_sockets.push_front(socket);
+                    }
+                    else if (valread > 0)
+                    {
+
+                        _event(socket, buffer);
+
+                    }
                 }
-                else if (valread > 0)
-                {
-                    cout << "Data recived from client "<< socket << " :" << buffer << endl;
+            }
 
-                    //MessageQueue.push(buffer);
-
-                    auto response = "server ok";
-
-                    SendMessage(socket, (char*)response);
-
-                    cout << "Response sent to the client." << endl;
-                }
+            for (auto socket : disconected_sockets)
+            {
+                _client_sockets.remove(socket);
             }
         }
 
-        for (auto socket : disconected_sockets)
-        {
-            _client_sockets.remove(socket);
-        }
-        
     }
 
-    bool SendMessage(int socket, char* message) 
-    { 
+    bool SendMessage(int socket, char* message)
+    {
         try
         {
             send(socket, message, strlen(message), 0);
@@ -149,7 +151,7 @@ public:
     }
 
 
-    ~TCPServer() 
+    ~TCPServer()
     {
 
         #ifdef _WIN64
