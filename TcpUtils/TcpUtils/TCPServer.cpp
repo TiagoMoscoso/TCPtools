@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <cerrno>
-#ifdef _WIN64
+#if defined(_WIN32) || defined(_WIN64)
 # include <winsock2.h>
 # include <ws2tcpip.h>
 # pragma comment(lib, "ws2_32.lib") 
@@ -15,9 +15,11 @@
 #include <queue>
 #include <algorithm>
 #include <functional>
+#include "Logger.h"
 
 using namespace std;
 #define BUFFER_SIZE 1024
+
 class TCPServer {
 private:
     int _server_fd;
@@ -29,136 +31,131 @@ private:
     fd_set _readfds;
     list<int> _client_sockets;
     function<void(int, char[1024])> _event;
-public:
 
-    TCPServer(int port, const function<void(int, char[1024])>& event)
+public:
+    
+    TCPServer(int port, const function<void(int, char[1024])>& event) 
     {
         _port = port;
         _event = event;
+
+        #if defined(_WIN32) || defined(_WIN64)
+        Logger::LogInfo("Tcp server running in windows 64 mode!");
         WSADATA wsaData;
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            printf("Failed to initialize Winsock. Error Code: %d\n", WSAGetLastError());
+            Logger::LogDanger("Failed to initialize Winsock. Error Code: " + to_string(WSAGetLastError()) + "\n");
             exit(EXIT_FAILURE);
         }
-
         _server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (_server_fd == INVALID_SOCKET) {
-            printf("Socket creation failed. Error Code: %d\n", WSAGetLastError());
+            Logger::LogDanger("Socket creation failed. Error Code: " + to_string(WSAGetLastError()) + "\n");
             WSACleanup();
             exit(EXIT_FAILURE);
         }
-
-
-        #ifdef _WIN64
         setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR, (char*)&_opt, sizeof(_opt));
         #else
-        setsockopt(_server_fd, SOL_SOCKET, SO_REUSEPORT, &_opt, sizeof(_opt));
+        Logger::LogInfo("Tcp server running in linux mode!");
+        _server_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (_server_fd == -1) {
+            Logger::LogDanger("Socket creation failed. Error Code: " + to_string(errno) + "\n");
+            exit(EXIT_FAILURE);
+        }
+        setsockopt(_server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &_opt, sizeof(_opt));
         #endif
+
         memset(&_address, 0, sizeof(_address));
         _address.sin_family = AF_INET;
         _address.sin_addr.s_addr = INADDR_ANY;
         _address.sin_port = htons(_port);
 
-
-        #ifdef _WIN64
-        if (::bind(_server_fd, (struct sockaddr*)&_address, sizeof(_address)) < 0)
-        {
-            fprintf(stderr, "Bind failed: %d\n", WSAGetLastError());
+        #if defined(_WIN32) || defined(_WIN64)
+        if (::bind(_server_fd, (struct sockaddr*)&_address, sizeof(_address)) < 0) {
+            Logger::LogDanger("Bind failed: " + to_string(WSAGetLastError()) + "\n");
             WSACleanup();
+            exit(EXIT_FAILURE);
+        }
+        #else
+        if (bind(_server_fd, (struct sockaddr*)&_address, sizeof(_address)) < 0) {
+            Logger::LogDanger("Bind failed: " + to_string(errno) + "\n");
             exit(EXIT_FAILURE);
         }
         #endif
 
         if (listen(_server_fd, 3) < 0) {
-            perror("Listen failed");
+            Logger::LogDanger("Listen failed\n");
             exit(EXIT_FAILURE);
         }
 
         _timeout.tv_sec = 1;
         _timeout.tv_usec = 0;
 
-        cout << "Server is running in port " << port;
+        Logger::LogDebug("Server is running on port " + to_string(port));
     }
 
-    void Start()
-    {
-
+    void Start() {
         int new_socket = 0;
         char buffer[1024] = { 0 };
 
-        while (true)
-        {
+        while (true) {
             FD_ZERO(&_readfds);
             FD_SET(_server_fd, &_readfds);
 
             if (select(_server_fd + 1, &_readfds, NULL, NULL, &_timeout) <= 0 && _client_sockets.size() == 0)
                 continue;
 
-            if (FD_ISSET(_server_fd, &_readfds))
-                if ((new_socket = accept(_server_fd, (struct sockaddr*)&_address, &_addrlen)) < 0)
-                    continue;
+            if (FD_ISSET(_server_fd, &_readfds)) {
+                new_socket = accept(_server_fd, (struct sockaddr*)&_address, (socklen_t*)&_addrlen);
+                if (new_socket < 0) continue;
+                FD_SET(new_socket, &_readfds);
+                _client_sockets.push_front(new_socket);
+            }
 
+            auto disconnected_sockets = list<int>();
 
-            FD_SET(new_socket, &_readfds);
-
-
-            auto it = find(_client_sockets.begin(), _client_sockets.end(), new_socket);
-            if (it == _client_sockets.end()) _client_sockets.push_front(new_socket);
-
-            auto disconected_sockets = list<int>();
-
-            for (auto socket : _client_sockets)
-            {
-
-                if (FD_ISSET(socket, &_readfds))
-                {
+            for (auto socket : _client_sockets) {
+                if (FD_ISSET(socket, &_readfds)) {
                     auto valread = recv(socket, buffer, sizeof(buffer), 0);
-                    if (valread <= 0)
-                    {
-                        cout << "Client Disconected " << socket << endl;
+                    if (valread <= 0) {
+                        Logger::LogInfo("Client Disconnected " + to_string(socket));
+                        #if defined(_WIN32) || defined(_WIN64)
                         closesocket(socket);
+                        #else
+                        close(socket);
+                        #endif
                         FD_CLR(socket, &_readfds);
-                        disconected_sockets.push_front(socket);
+                        disconnected_sockets.push_front(socket);
                     }
-                    else if (valread > 0)
-                    {
-
+                    else if (valread > 0) {
                         _event(socket, buffer);
-
                     }
                 }
             }
 
-            for (auto socket : disconected_sockets)
-            {
+            for (auto socket : disconnected_sockets) {
                 _client_sockets.remove(socket);
             }
         }
-
     }
 
-    bool SendMessage(int socket, char* message)
+    bool SendMessages(int socket, char* message)
     {
-        try
+        try 
         {
             send(socket, message, strlen(message), 0);
             return true;
         }
-        catch (exception)
-        {
+        catch (exception& e) {
+            Logger::LogDanger("SendMessage error: " + string(e.what()));
             return false;
         }
     }
 
-
-    ~TCPServer()
-    {
-
-        #ifdef _WIN64
+    ~TCPServer() {
+#if defined(_WIN32) || defined(_WIN64)
         closesocket(_server_fd);
         WSACleanup();
-        #else
-        close(new_socket);
-        #endif
+#else
+        close(_server_fd);
+#endif
     }
 };

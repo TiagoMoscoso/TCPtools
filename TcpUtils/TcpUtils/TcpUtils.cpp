@@ -4,18 +4,18 @@
 #include "TcpUtils.h"
 #include "TCPServer.cpp"
 #include "TCPClient.cpp"
+#include "Logger.h"
 using namespace std;
 
 void MessageEvent(int socket, char buffer[1024])
 {
-
-	cout << "Data recived from client " << socket << " :" << buffer << endl;
+	Logger::LogInfo("Data received from client " + to_string(socket) + " : " + buffer);
 
 	auto response = "server ok";
 
 	//tcpServer.SendMessage(socket, (char*)response);
 
-	cout << "Response sent to the client." << endl;
+	Logger::LogInfo("Response sent to the client.");
 }
 
 int main()
