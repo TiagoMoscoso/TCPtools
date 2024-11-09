@@ -1,17 +1,33 @@
 #include <iostream>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include <cstdint>
 #include <string>
+#include <cstring>
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#define BUFFER_SIZE 1024
+
+#elif defined(__linux__)
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#define BUFFER_SIZE 1024
+#define SOCKET int
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
+#endif
+
+#include <functional>
+#include "Logger.h"
 
 using namespace std;
-
-#pragma comment(lib, "ws2_32.lib") // Link with ws2_32.lib
-#define BUFFER_SIZE 1024
 
 class TCPClient
 {
 private:
+#if defined(_WIN32) || defined(_WIN64)
     WSADATA wsaData;
     SOCKET sock;
     struct sockaddr_in server_addr;
@@ -19,57 +35,99 @@ private:
     const char* message = "Hello from client!";
     char _address[12] = "127.0.0.1";
     u_short _port = 5060;
+#elif defined(__linux__)
+    int sock;
+    struct sockaddr_in server_addr;
+    char buffer[BUFFER_SIZE] = { 0 };
+    const char* message = "Hello from client!";
+    const char* _address = "127.0.0.1";
+    uint16_t _port = 5060;
+#endif
+    function<void(char[1024])> _event;
+
 public:
-    TCPClient(const char address[12], u_short port)
+    TCPClient(const char* address, int port, const function<void(char[1024])>& event)
     {
+        _event = event;
+#if defined(_WIN32) || defined(_WIN64)
+        Logger::LogInfo("Tcp server running in windows 64 mode!");
         strcpy(_address, address);
         _port = port;
 
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-            std::cerr << "Failed to initialize Winsock." << std::endl;
+            Logger::LogDanger("Failed to initialize Winsock.");
             exit(EXIT_FAILURE);
         }
 
         // Create socket
         sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock == INVALID_SOCKET) {
-            std::cerr << "Failed to create socket." << std::endl;
+            Logger::LogDanger("Failed to create socket.");
             WSACleanup();
             exit(EXIT_FAILURE);
         }
 
         server_addr.sin_family = AF_INET;
         server_addr.sin_port = htons(port);
-        inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr); 
+        inet_pton(AF_INET, address, &server_addr.sin_addr);
 
         if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-            std::cerr << "Connection failed." << std::endl;
+            Logger::LogDanger("Connection failed.");
             closesocket(sock);
             WSACleanup();
             exit(EXIT_FAILURE);
         }
-        SendMessages();
-        MessageRecive();
+#elif defined(__linux__)
+        Logger::LogInfo("Tcp server running in linux mode!");
+        _address = address;
+        _port = port;
+
+        // Create socket
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock == INVALID_SOCKET) {
+            Logger::LogDanger("Failed to create socket.");
+            exit(EXIT_FAILURE);
+        }
+
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(port);
+        if (inet_pton(AF_INET, address, &server_addr.sin_addr) <= 0) {
+            Logger::LogDanger("Invalid address/Address not supported.");
+            exit(EXIT_FAILURE);
+        }
+
+        // Connect to server
+        if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            Logger::LogDanger("Connection failed.");
+            close(sock);
+            exit(EXIT_FAILURE);
+        }
+#endif
 
     }
 
-    void MessageRecive()
+    void MessageReceive()
     {
-        int valread = recv(sock, buffer, BUFFER_SIZE, 0);
-        buffer[valread] = '\0';
-        std::cout << "Message from server: " << buffer << std::endl;
+        auto valread = recv(sock, buffer, BUFFER_SIZE, 0);
+        _event(buffer);
 
     }
 
     void SendMessages()
     {
         send(sock, message, strlen(message), 0);
-        std::cout << "Message sent to server." << std::endl;
+        Logger::LogInfo("Message sent to server.");
     }
 
     ~TCPClient()
     {
+#if defined(_WIN32) || defined(_WIN64)
         closesocket(sock);
         WSACleanup();
+#elif defined(__linux__)
+        close(sock);
+#endif
     }
 };
+
+

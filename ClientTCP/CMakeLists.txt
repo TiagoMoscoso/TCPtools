@@ -1,15 +1,17 @@
-﻿# CMakeList.txt: arquivo de projeto de CMake de nível superior, fazer configuração global
-# e inclua subprojetos aqui.
-#
-cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.8)
 
-# Habilite a Recarga Dinâmica para compiladores MSVC, se houver suporte.
-if (POLICY CMP0141)
-  cmake_policy(SET CMP0141 NEW)
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+project(ClientTCP)
+
+add_subdirectory("../TcpUtils" "${CMAKE_BINARY_DIR}/TcpUtils_build")
+ 
+add_executable(ClientTCP "ClientTCP/ClientTCP.cpp" "ClientTCP/ClientTCP.h")
+
+target_include_directories(ClientTCP PRIVATE
+    "../TcpUtils/TcpUtils"
+)
+
+target_link_libraries(ClientTCP PRIVATE TcpUtils)
+
+if (CMAKE_VERSION VERSION_GREATER 3.12)
+    set_property(TARGET ClientTCP PROPERTY CXX_STANDARD 20)
 endif()
-
-project ("ClientTCP")
-
-# Inclua subprojetos.
-add_subdirectory ("ClientTCP")
