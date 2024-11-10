@@ -13,7 +13,7 @@ add_library(TcpUtils STATIC
     "TcpUtils/TCPServer.cpp"
     "TcpUtils/TCPClient.cpp"
     "TcpUtils/Logger.h"
-)
+    "TcpUtils/MessageContent.cpp")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET TcpUtils PROPERTY CXX_STANDARD 20)

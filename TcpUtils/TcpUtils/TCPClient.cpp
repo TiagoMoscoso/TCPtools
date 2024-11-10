@@ -27,31 +27,30 @@ using namespace std;
 class TCPClient
 {
 private:
+    char* _address;
 #if defined(_WIN32) || defined(_WIN64)
     WSADATA wsaData;
     SOCKET sock;
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = { 0 };
-    const char* message = "Hello from client!";
-    char _address[12] = "127.0.0.1";
-    u_short _port = 5060;
-#elif defined(__linux__)
+    int _port = 5060;
+#else
     int sock;
     struct sockaddr_in server_addr;
     char buffer[BUFFER_SIZE] = { 0 };
-    const char* message = "Hello from client!";
-    const char* _address = "127.0.0.1";
-    uint16_t _port = 5060;
+    int _port = 5060;
 #endif
     function<void(char[1024])> _event;
 
 public:
-    TCPClient(const char* address, int port, const function<void(char[1024])>& event)
+    TCPClient(char* address, const int port, const function<void(char[1024])>& event)
     {
+        _address = (char*)address;
         _event = event;
 #if defined(_WIN32) || defined(_WIN64)
         Logger::LogInfo("Tcp server running in windows 64 mode!");
-        strcpy(_address, address);
+        _address = (char*)address;
+
         _port = port;
 
         if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -77,10 +76,10 @@ public:
             WSACleanup();
             exit(EXIT_FAILURE);
         }
-#elif defined(__linux__)
+#else
         Logger::LogInfo("Tcp server running in linux mode!");
         _address = address;
-        _port = port;
+        _port = (uint16_t)port;
 
         // Create socket
         sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -113,7 +112,7 @@ public:
 
     }
 
-    void SendMessages()
+    void SendMessages(const char* message)
     {
         send(sock, message, strlen(message), 0);
         Logger::LogInfo("Message sent to server.");
@@ -124,7 +123,7 @@ public:
 #if defined(_WIN32) || defined(_WIN64)
         closesocket(sock);
         WSACleanup();
-#elif defined(__linux__)
+#else
         close(sock);
 #endif
     }
