@@ -114,8 +114,16 @@ public:
 
     void SendMessages(const char* message)
     {
-        send(sock, message, strlen(message), 0);
-        Logger::LogInfo("Message sent to server.");
+        int sender;
+        int tries = 0;
+        do {
+            sender = send(sock, message, strlen(message), 0);
+            if (sender > 0)
+                Logger::LogInfo("Message sent to server.");
+            else
+                Logger::LogDanger("Errpr to send to server.");
+            tries++;
+        } while (sender == -1 && tries < 5);
     }
 
     ~TCPClient()
