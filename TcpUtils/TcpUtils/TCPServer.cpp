@@ -86,8 +86,8 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        _timeout.tv_sec = 1;
-        _timeout.tv_usec = 0;
+
+        _timeout.tv_usec = 100000;
 
         Logger::LogDebug("Server is running on port " + to_string(port));
     }
@@ -96,10 +96,15 @@ public:
         int new_socket = 0;
         char buffer[1024] = { 0 };
 
-        while (true) {
+
+
+        while (true) 
+        {
             FD_ZERO(&_readfds);
             FD_SET(_server_fd, &_readfds);
 
+            for (auto socket : _client_sockets) FD_SET(socket, &_readfds);
+            
             if (select(_server_fd + 1, &_readfds, NULL, NULL, &_timeout) <= 0 && _client_sockets.size() == 0)
                 continue;
 
@@ -112,36 +117,68 @@ public:
 
             auto disconnected_sockets = list<int>();
 
-            for (auto socket : _client_sockets) {
-                if (FD_ISSET(socket, &_readfds)) {
-                    auto valread = recv(socket, buffer, sizeof(buffer), 0);
-                    if (valread <= 0) {
-                        Logger::LogInfo("Client Disconnected " + to_string(socket));
-                        #if defined(_WIN32) || defined(_WIN64)
-                        closesocket(socket);
-                        #else
-                        close(socket);
-                        #endif
-                        FD_CLR(socket, &_readfds);
-                        disconnected_sockets.push_front(socket);
+            if (!_client_sockets.empty())
+                for (auto socket : _client_sockets)
+                {
+#if defined(_WIN32) || defined(_WIN64)
+                    if (FD_ISSET(socket, &_readfds)) {
+                        auto valread = recv(socket, buffer, sizeof(buffer), 0);
+                        if (valread <= 0) {
+                            Logger::LogInfo("Client Disconnected " + to_string(socket));
+                            closesocket(socket);
+                            FD_CLR(socket, &_readfds);
+                            disconnected_sockets.push_front(socket);
+
+                        }
+                        else
+                        {
+                            _event(socket, buffer);
+                        }
                     }
-                    else if (valread > 0) {
+
+#else
+                    auto valread = read(socket, buffer, sizeof(buffer));
+                    if (valread < 0) {
+                        Logger::LogInfo("Client Disconnected " + to_string(socket));
+
+                        close(socket);
+                        disconnected_sockets.push_front(socket);
+
+                    }
+                    else if(valread-1 != 0)
+                    {
                         _event(socket, buffer);
                     }
-                }
-            }
+#endif
 
-            for (auto socket : disconnected_sockets) {
-                _client_sockets.remove(socket);
-            }
+                    for (int i = 0; i < 1024; ++i) buffer[i] = '\0';
+
+                }
+
+            if(!disconnected_sockets.empty())
+                for (auto socket : disconnected_sockets) _client_sockets.remove(socket);
         }
     }
+    
 
     bool SendMessages(int socket, char* message)
     {
+        if (socket <= 0)return;
         try 
         {
-            send(socket, message, strlen(message), 0);
+            auto sender = send(socket, message, strlen(message), 0);
+
+            if (bytes_sent < 0) 
+            {
+                if (errno == EPIPE) {
+                    Logger::LogDanger("Erro de 'broken pipe': o socket foi fechado pelo outro lado.";
+                }
+                else {
+                    Logger::LogDanger("Erro ao enviar mensagem: " + strerror(errno));
+                }
+                return false;
+            }
+
             return true;
         }
         catch (exception& e) {

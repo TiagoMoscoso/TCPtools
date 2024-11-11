@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.10)
 
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -14,6 +14,8 @@ add_library(TcpUtils STATIC
     "TcpUtils/TCPClient.cpp"
     "TcpUtils/Logger.h"
     "TcpUtils/MessageContent.cpp")
+
+
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET TcpUtils PROPERTY CXX_STANDARD 20)

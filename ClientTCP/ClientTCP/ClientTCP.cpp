@@ -4,7 +4,7 @@
 #include "TCPClient.cpp"
 #include "MessageContent.cpp"
 #include <functional>
-
+#include <iostream>
 using namespace std;
 
 class Program {
@@ -21,15 +21,21 @@ public:
     void MessageEvent(char* buffer)
     {
         auto messageContent = MessageContent(buffer);
-        Logger::LogInfo("Data received from server : " + messageContent.messagestr);
-        
 
         switch (messageContent.type)
         {
             case 0:
                 id = messageContent.orig_uid;
+                Logger::LogInfo("Data received from server : " + messageContent.messagestr);
                 Logger::LogDebug("Connection accepted my ID is : " + to_string(id));
                 break;
+            case 3:
+                Logger::LogDebug("List of connected clients : " + messageContent.messagestr);
+                break;
+            default:
+                Logger::LogInfo("Data received from server : " + messageContent.messagestr);
+                break;
+
         }
     }
 
@@ -47,20 +53,47 @@ public:
 
     void Run() 
     {
-
+        auto messageContent = MessageContent(0, 0, 0, 1024, "OI");
+        ClientSendMessage(messageContent);
+        tcpClient.MessageReceive();
         while (true)
         {
-            auto messageContent = MessageContent(0, 0, 0, 1024, "Connection Request!");
+
+            short int type = 3;
+            short int destinataryId;
+            char message[1024];
+
+            memset(message, 0, sizeof(message));
+
+
+            messageContent = MessageContent(type, id, 0, 16, "List_Connections");
             ClientSendMessage(messageContent);
             tcpClient.MessageReceive();
+
+            type = 2;
+            memset(message, 0, sizeof(message));
+
+            Logger::LogInfo("Enter the destinatary ID or enter with -1 to stop the application: ");
+            cin >> destinataryId;
+
+            if (destinataryId == -1) break;
+
+            Logger::LogInfo("Enter the message: ");
+
+            cin >> message;
+            
+
+            messageContent = MessageContent(type, id, destinataryId, sizeof(message), message);
+            ClientSendMessage(messageContent);
+            tcpClient.MessageReceive();
+            if (id == destinataryId) tcpClient.MessageReceive();
+            
         }
+        messageContent = MessageContent(1, id, 0, 1024, "TCHAU");
+        ClientSendMessage(messageContent);
+        tcpClient.MessageReceive();
     }
 };
-
-static void Event(char* buffer)
-{
-    Logger::LogInfo("Data received from server : " + string(buffer));
-}
 
 int main()
 {
