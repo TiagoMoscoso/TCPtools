@@ -1,10 +1,10 @@
-#ifndef MESSAGECONTENT_H
-#define MESSAGECONTENT_H
+#ifndef MESSAGECONTENT_CPP
+#define MESSAGECONTENT_CPP
 
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <cstring> // Para usar strncpy
+#include <cstring>
 
 #define BUFFER_SIZE 1024
 
@@ -17,24 +17,30 @@ public:
     unsigned short int dest_uid;
     unsigned short int text_len;
     string messagestr;
-    char message[1024];
+    char message[BUFFER_SIZE] = {};
 
     MessageContent(int t, int orig, int dest, int txt_len, const char* msg)
-        : type(t), orig_uid(orig), dest_uid(dest), text_len(txt_len) {
+        : type(t), orig_uid(orig), dest_uid(dest), text_len(txt_len) 
+    {
+        for (int i = 0; i < BUFFER_SIZE; ++i) message[i] = '\0';
         strncpy(message, msg, sizeof(message) - 1);
         message[sizeof(message) - 1] = '\0';
+        messagestr;
     }
 
     MessageContent(char* binary_cstr)
     {
+        for (int i = 0; i < BUFFER_SIZE; ++i) message[i] = '\0';
+        messagestr = "";
+
         istringstream iss(binary_cstr);
 
         type = deserializeType(iss);
         orig_uid = deserializeOrigin_uid(iss);
         dest_uid = deserializeDest_uid(iss);
-        text_len = deserializeText_len(iss);;
+        text_len = deserializeText_len(iss);
         messagestr = deserializeMessage(iss);
-
+        strcpy(message, messagestr.c_str());
     }
 
     void serialize(ostringstream& out, MessageContent msgContent) {

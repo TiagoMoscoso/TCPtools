@@ -18,7 +18,8 @@
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #endif
-
+#include <thread>
+#include <chrono>
 #include <functional>
 #include "Logger.h"
 
@@ -32,12 +33,10 @@ private:
     WSADATA wsaData;
     SOCKET sock;
     struct sockaddr_in server_addr;
-    char buffer[BUFFER_SIZE] = { 0 };
     int _port = 5060;
 #else
     int sock;
     struct sockaddr_in server_addr;
-    char buffer[BUFFER_SIZE] = { 0 };
     int _port = 5060;
 #endif
     function<void(char[1024])> _event;
@@ -48,7 +47,7 @@ public:
         _address = (char*)address;
         _event = event;
 #if defined(_WIN32) || defined(_WIN64)
-        Logger::LogInfo("Tcp server running in windows 64 mode!");
+        Logger::LogInfo("Client running in windows 64 mode!");
         _address = (char*)address;
 
         _port = port;
@@ -77,7 +76,7 @@ public:
             exit(EXIT_FAILURE);
         }
 #else
-        Logger::LogInfo("Tcp server running in linux mode!");
+        Logger::LogInfo("Client running in linux mode!");
         _address = address;
         _port = (uint16_t)port;
 
@@ -107,15 +106,20 @@ public:
 
     void MessageReceive()
     {
+        char buffer[1024] = { 0 };
+#if defined(_WIN32) || defined(_WIN64)
         auto valread = recv(sock, buffer, BUFFER_SIZE, 0);
+#else
+        auto valread = read(sock, buffer, sizeof(buffer));
+#endif
         _event(buffer);
 
     }
 
     void SendMessages(const char* message)
     {
-        int sender;
-        int tries = 0;
+        auto sender = -1;
+        auto tries = 0;
         do {
             sender = send(sock, message, strlen(message), 0);
             if (sender > 0)
